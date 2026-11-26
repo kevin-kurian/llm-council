@@ -32,15 +32,29 @@ npm install
 cd ..
 ```
 
-### 2. Configure API Key
+### 2. Configure Models and Providers
 
-Create a `.env` file in the project root:
+Models are `"<provider>:<model>"`. OpenRouter models need an API key in `.env`:
 
 ```bash
 OPENROUTER_API_KEY=sk-or-v1-...
 ```
 
-Get your API key at [openrouter.ai](https://openrouter.ai/). Make sure to purchase the credits you need, or sign up for automatic top up.
+Get your key at [openrouter.ai](https://openrouter.ai/).
+
+Subscription CLIs need no key — just be logged in locally (`codex login`, `grok`, `agy`):
+
+| Prefix | Example | CLI used |
+|---|---|---|
+| `openrouter:` | `openrouter:google/gemini-3-pro-preview` | HTTP API |
+| `codex:` | `codex:gpt-6.1-sol` | `codex exec` (ChatGPT subscription) |
+| `grok:` | `grok:grok-4.7` | `grok -p` (grok.com subscription) |
+| `agy:` | `agy:gemini-4-hydrogen-high` | `agy -p` (Antigravity subscription) |
+
+Bare identifiers such as `google/gemini-2.5-flash` still default to OpenRouter.
+Subscription calls burn plan quota: each call carries the CLI's ~10-20k token system prompt.
+
+Verify a setup with `uv run python -m backend.test_providers --live`.
 
 ### 3. Configure Models (Optional)
 

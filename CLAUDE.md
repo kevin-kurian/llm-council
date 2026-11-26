@@ -11,9 +11,18 @@ LLM Council is a 3-stage deliberation system where multiple LLMs collaboratively
 ### Backend Structure (`backend/`)
 
 **`config.py`**
-- Contains `COUNCIL_MODELS` (list of OpenRouter model identifiers)
-- Contains `CHAIRMAN_MODEL` (model that synthesizes final answer)
-- Uses environment variable `OPENROUTER_API_KEY` from `.env`
+- Contains `COUNCIL_MODELS` (`"<provider>:<model>"` identifiers)
+- Contains `CHAIRMAN_MODEL` (model that synthesizes final answer) and `TITLE_MODEL`
+- Uses environment variable `OPENROUTER_API_KEY` from `.env` (only for `openrouter:` models)
+
+**`providers.py`**
+- Dispatches each model identifier to a provider: `openrouter` (HTTP), `codex`, `grok`, `agy` (local subscription CLIs)
+- CLI adapters shell out with `asyncio.create_subprocess_exec`, cwd = system temp dir so agents cannot touch this repo
+- Codex: `codex exec --json --sandbox read-only -c model=...` (prompt on stdin), parse last `agent_message`
+- Grok: `grok -p --output-format json` (prompt on stdin), read `text`
+- Agy: `agy -p=<prompt> --output-format json` (no stdin support), read `response`
+- Bare identifiers default to OpenRouter, so old configs keep working
+- `council.py` imports `query_model`/`query_models_parallel` from here, not `openrouter.py`
 - Backend runs on **port 8001** (NOT 8000 - user had another app on 8000)
 
 **`openrouter.py`**
@@ -144,6 +153,8 @@ Models are hardcoded in `backend/config.py`. Chairman can be same or different f
 ## Testing Notes
 
 Use `test_openrouter.py` to verify API connectivity and test different model identifiers before adding to council. The script tests both streaming and non-streaming modes.
+
+Use `uv run python -m backend.test_providers` for offline parse checks, and `--live` to call every configured provider once (burns subscription quota).
 
 ## Data Flow Summary
 

@@ -8,16 +8,25 @@ load_dotenv()
 # OpenRouter API key
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
-# Council members - list of OpenRouter model identifiers
+# Council members - "<provider>:<model>". Bare identifiers use OpenRouter.
 COUNCIL_MODELS = [
-    "openai/gpt-5.1",
-    "google/gemini-3-pro-preview",
-    "anthropic/claude-sonnet-4.5",
-    "x-ai/grok-4",
+    "openrouter:deepseek/deepseek-v4.1-flash-1017",
+    "codex:gpt-6.2-sol",
+    "grok:grok-4.7",
+    "agy:gemini-4-hydrogen-high",
 ]
 
 # Chairman model - synthesizes final response
-CHAIRMAN_MODEL = "google/gemini-3-pro-preview"
+CHAIRMAN_MODEL = "codex:gpt-6.2-astra"
+
+# Reasoning effort sent to every provider that supports it (low|medium|high|xhigh|max)
+REASONING_EFFORT = "high"
+
+# Cheap model for conversation titles (still uses REASONING_EFFORT)
+TITLE_MODEL = "agy:gemini-3.8-flash-low"
+
+# Per-call timeout; CLI agents are slower than raw API calls
+MODEL_TIMEOUT = 240.0
 
 # OpenRouter API endpoint
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
