@@ -2,7 +2,9 @@
 
 ![llmcouncil](header.jpg)
 
-The idea of this repo is that instead of asking a question to your favorite LLM provider (e.g. OpenAI GPT 5.1, Google Gemini 3.0 Pro, Anthropic Claude Sonnet 4.5, xAI Grok 4, eg.c), you can group them into your "LLM Council". This repo is a simple, local web app that essentially looks like ChatGPT except it uses OpenRouter to send your query to multiple LLMs, it then asks them to review and rank each other's work, and finally a Chairman LLM produces the final response.
+The idea of this repo is that instead of asking a question to your favorite LLM provider (e.g. OpenAI GPT 5.1, Google Gemini 3.0 Pro, Anthropic Claude Sonnet 4.5, xAI Grok 4, eg.c), you can group them into your "LLM Council". This repo is a simple, local web app that essentially looks like ChatGPT except it sends your query to multiple LLMs, it then asks them to review and rank each other's work, and finally a Chairman LLM produces the final response.
+
+Models can come from the OpenRouter API or from local subscription CLIs (Codex, Grok, Antigravity), mixed freely in one council.
 
 In a bit more detail, here is what happens when you submit a query:
 
@@ -18,19 +20,17 @@ This project was 99% vibe coded as a fun Saturday hack because I wanted to explo
 
 ### 1. Install Dependencies
 
-The project uses [uv](https://docs.astral.sh/uv/) for project management.
+The project uses [uv](https://docs.astral.sh/uv/) for Python and npm for the frontend.
 
-**Backend:**
 ```bash
 uv sync
-```
 
-**Frontend:**
-```bash
 cd frontend
 npm install
 cd ..
 ```
+
+The `npm install` output may mention audit findings and skipped install scripts for `esbuild`/`fsevents`. Both are harmless: the audit items are dev-only tooling, and the esbuild binary still loads.
 
 ### 2. Configure Models and Providers
 
@@ -46,15 +46,13 @@ Subscription CLIs need no key — just be logged in locally (`codex login`, `gro
 
 | Prefix | Example | CLI used |
 |---|---|---|
-| `openrouter:` | `openrouter:google/gemini-3-pro-preview` | HTTP API |
-| `codex:` | `codex:gpt-6.1-sol` | `codex exec` (ChatGPT subscription) |
+| `openrouter:` | `openrouter:deepseek/deepseek-v4.1-flash-1017` | HTTP API |
+| `codex:` | `codex:gpt-6.2-sol` | `codex exec` (ChatGPT subscription) |
 | `grok:` | `grok:grok-4.7` | `grok -p` (grok.com subscription) |
 | `agy:` | `agy:gemini-4-hydrogen-high` | `agy -p` (Antigravity subscription) |
 
 Bare identifiers such as `google/gemini-2.5-flash` still default to OpenRouter.
 Subscription calls burn plan quota: each call carries the CLI's ~10-20k token system prompt.
-
-Verify a setup with `uv run python -m backend.test_providers --live`.
 
 ### 3. Configure Models (Optional)
 
@@ -62,14 +60,43 @@ Edit `backend/config.py` to customize the council:
 
 ```python
 COUNCIL_MODELS = [
-    "openai/gpt-5.1",
-    "google/gemini-3-pro-preview",
-    "anthropic/claude-sonnet-4.5",
-    "x-ai/grok-4",
+    "openrouter:deepseek/deepseek-v4.1-flash-1017",
+    "codex:gpt-6.2-sol",
+    "grok:grok-4.7",
+    "agy:gemini-4-hydrogen-high",
 ]
 
-CHAIRMAN_MODEL = "google/gemini-3-pro-preview"
+CHAIRMAN_MODEL = "codex:gpt-6.2-astra"
+REASONING_EFFORT = "high"   # low|medium|high|xhigh|max, per provider
 ```
+
+`REASONING_EFFORT` is translated per provider: `reasoning.effort` on OpenRouter, `model_reasoning_effort` on Codex, `--reasoning-effort` on Grok, `--effort` on Antigravity. An agy slug that already ends in an effort level (`-low`, `-high`, ...) wins over the config value.
+
+### 4. Verify Providers
+
+```bash
+uv run python -m backend.test_providers --live
+```
+
+Runs parse checks, then one live call per council model:
+
+```
+parse checks passed
+openrouter:deepseek/deepseek-v4.1-flash-1017: 'OK'
+codex:gpt-6.2-sol: 'OK'
+grok:grok-4.7: 'OK'
+agy:gemini-4-hydrogen-high: 'OK'
+```
+
+Omit `--live` for offline checks only. A failing model is reported but does not stop the others; fix `backend/config.py` before starting the app.
+
+### 5. Optional: Pre-commit Hook
+
+```bash
+pre-commit install
+```
+
+Runs [gitleaks](https://github.com/gitleaks/gitleaks) on staged changes and blocks commits that contain secrets.
 
 ## Running the Application
 
@@ -93,9 +120,11 @@ npm run dev
 
 Then open http://localhost:5173 in your browser.
 
+One question costs 9 model calls (4 stage 1, 4 stage 2, 1 chairman) plus a title call. Stages run in parallel, so expect roughly 1-3 minutes per answer with subscription CLIs. A model that errors or times out is dropped and the council continues with the rest; errors print in the backend terminal.
+
 ## Tech Stack
 
-- **Backend:** FastAPI (Python 3.10+), async httpx, OpenRouter API
+- **Backend:** FastAPI (Python 3.10+), async httpx for OpenRouter, subprocess adapters for subscription CLIs
 - **Frontend:** React + Vite, react-markdown for rendering
 - **Storage:** JSON files in `data/conversations/`
 - **Package Management:** uv for Python, npm for JavaScript
